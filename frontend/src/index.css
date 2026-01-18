@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-racing-red: #E10600;
+  --color-carbon: #1A1A1A;
+  --color-pit-wall: #15151E;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #0D0D0D 0%, #15151E 50%, #1A1A1A 100%);
+  min-height: 100vh;
+  color: #FFFFFF;
+  font-family: 'Titillium Web', system-ui, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E10600;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF1E1E;
+}
+
+/* Racing stripe accents */
+@layer components {
+  .racing-stripe {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .racing-stripe::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #E10600, #FF4136, #E10600);
+  }
+
+  .card {
+    @apply bg-carbon-light/50 backdrop-blur-xl border border-white/10 rounded-lg;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .card-highlight {
+    @apply card;
+    border-color: rgba(225, 6, 0, 0.3);
+    box-shadow: 0 4px 24px rgba(225, 6, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-racing-red text-white font-semibold rounded-lg transition-all duration-200;
+    @apply hover:bg-red-600 hover:scale-105 hover:shadow-lg hover:shadow-racing-red/30;
+    @apply active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-carbon-light text-white font-semibold rounded-lg border border-white/20 transition-all duration-200;
+    @apply hover:bg-carbon hover:border-white/40;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-carbon border border-white/20 rounded-lg text-white placeholder-gray-500;
+    @apply focus:outline-none focus:border-racing-red focus:ring-1 focus:ring-racing-red;
+  }
+
+  .timing-display {
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold font-racing tracking-wider;
+  }
+
+  .stat-label {
+    @apply text-xs uppercase tracking-widest text-gray-400;
+  }
+
+  /* Tire compound badges */
+  .tire-soft { @apply bg-tire-soft text-white; }
+  .tire-medium { @apply bg-tire-medium text-black; }
+  .tire-hard { @apply bg-tire-hard text-black; }
+  .tire-inter { @apply bg-tire-inter text-white; }
+  .tire-wet { @apply bg-tire-wet text-white; }
+
+  /* Glowing effects */
+  .glow-red {
+    box-shadow: 0 0 20px rgba(225, 6, 0, 0.5), 0 0 40px rgba(225, 6, 0, 0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+  }
+
+  /* Grid background */
+  .grid-bg {
+    background-image: 
+      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Animated pulse for live indicators */
+  .live-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+/* Chart customizations */
+.recharts-cartesian-axis-tick-value {
+  fill: #9CA3AF;
+  font-size: 11px;
+}
+
+.recharts-legend-item-text {
+  color: #9CA3AF !important;
+}
+
+/* Animation classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
