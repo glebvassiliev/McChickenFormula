@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     
     # OpenF1 API
     openf1_base_url: str = "https://api.openf1.org/v1"
+
+    # FastF1
+    fastf1_cache_dir: str = "./data/fastf1_cache"
     
     # Database
     database_url: str = "sqlite+aiosqlite:///./f1_strategy.db"

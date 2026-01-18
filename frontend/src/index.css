@@ -6,6 +6,7 @@
   --color-racing-red: #E10600;
   --color-carbon: #1A1A1A;
   --color-pit-wall: #15151E;
+  --color-neutral-950: #0a0a0a;
 }
 
 * {
@@ -15,29 +16,31 @@
 body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #0D0D0D 0%, #15151E 50%, #1A1A1A 100%);
+  background: #000000;
   min-height: 100vh;
   color: #FFFFFF;
-  font-family: 'Titillium Web', system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1A1A1A;
+  background: #0a0a0a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #E10600;
-  border-radius: 4px;
+  background: #333;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF1E1E;
+  background: #E10600;
 }
 
 /* Racing stripe accents */
@@ -52,36 +55,81 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 4px;
+    width: 3px;
     height: 100%;
     background: linear-gradient(180deg, #E10600, #FF4136, #E10600);
   }
 
+  /* Bento Grid Card Base - Apple-like minimal design */
+  .bento-card {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] rounded-2xl;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bento-card:hover {
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .bento-card-header {
+    @apply flex items-center justify-between px-5 py-4 border-b border-white/[0.06];
+  }
+
+  .bento-card-title {
+    @apply text-xs font-medium uppercase tracking-widest text-white/60;
+    letter-spacing: 0.1em;
+  }
+
+  .bento-card-body {
+    @apply p-4;
+  }
+
+  /* Legacy card support */
   .card {
-    @apply bg-carbon-light/50 backdrop-blur-xl border border-white/10 rounded-lg;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    @apply bento-card;
   }
 
   .card-highlight {
-    @apply card;
+    @apply bento-card;
     border-color: rgba(225, 6, 0, 0.3);
     box-shadow: 0 4px 24px rgba(225, 6, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-racing-red text-white font-semibold rounded-lg transition-all duration-200;
-    @apply hover:bg-red-600 hover:scale-105 hover:shadow-lg hover:shadow-racing-red/30;
-    @apply active:scale-95;
+    @apply px-5 py-2.5 bg-white/10 text-white font-medium rounded-full text-sm backdrop-blur-sm border border-white/20;
+    @apply hover:bg-white/15 hover:border-white/30 transition-all duration-300;
+    @apply active:scale-[0.98] active:bg-white/10;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
 
   .btn-secondary {
-    @apply px-6 py-3 bg-carbon-light text-white font-semibold rounded-lg border border-white/20 transition-all duration-200;
-    @apply hover:bg-carbon hover:border-white/40;
+    @apply px-5 py-2.5 bg-transparent text-white/80 font-medium rounded-full text-sm border border-white/10;
+    @apply hover:bg-white/5 hover:border-white/20 hover:text-white transition-all duration-300;
+    @apply active:scale-[0.98];
+  }
+
+  .btn-toggle {
+    @apply px-4 py-2 rounded-full text-xs font-medium uppercase tracking-wider transition-all duration-300;
+  }
+
+  .btn-toggle-active {
+    @apply btn-toggle bg-white/10 text-white backdrop-blur-sm border border-white/20;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
+  .btn-toggle-inactive {
+    @apply btn-toggle bg-transparent text-white/40 hover:bg-white/5 hover:text-white/60 border border-transparent;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 bg-carbon border border-white/20 rounded-lg text-white placeholder-gray-500;
+    @apply w-full px-4 py-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white placeholder-neutral-500;
     @apply focus:outline-none focus:border-racing-red focus:ring-1 focus:ring-racing-red;
+  }
+
+  /* Monospace for telemetry data */
+  .telemetry-value {
+    @apply font-mono text-white tabular-nums;
   }
 
   .timing-display {
@@ -90,19 +138,43 @@ body {
   }
 
   .stat-value {
-    @apply text-3xl font-bold font-racing tracking-wider;
+    @apply text-2xl font-semibold font-mono tracking-tight text-white;
+    font-variant-numeric: tabular-nums;
   }
 
   .stat-label {
-    @apply text-xs uppercase tracking-widest text-gray-400;
+    @apply text-[11px] uppercase tracking-[0.15em] text-white/50 font-medium;
+    letter-spacing: 0.15em;
   }
 
   /* Tire compound badges */
+  .tire-badge {
+    @apply px-2 py-0.5 rounded text-[10px] font-bold uppercase;
+  }
+
   .tire-soft { @apply bg-tire-soft text-white; }
   .tire-medium { @apply bg-tire-medium text-black; }
   .tire-hard { @apply bg-tire-hard text-black; }
   .tire-inter { @apply bg-tire-inter text-white; }
   .tire-wet { @apply bg-tire-wet text-white; }
+
+  /* Delta indicators */
+  .delta-positive { @apply text-delta-positive; }
+  .delta-negative { @apply text-delta-negative; }
+  .delta-pb { @apply text-delta-pb; }
+
+  /* Position change arrows */
+  .position-up {
+    @apply text-timing-green;
+  }
+
+  .position-down {
+    @apply text-racing-red;
+  }
+
+  .position-stable {
+    @apply text-neutral-500;
+  }
 
   /* Glowing effects */
   .glow-red {
@@ -117,28 +189,86 @@ body {
     text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
   }
 
-  /* Grid background */
+  /* Strategy Call Indicator */
+  .strategy-call-pulse {
+    animation: strategyPulse 1.5s ease-in-out infinite;
+    @apply border border-racing-red/50;
+  }
+
+  /* Grid background - subtle for Apple-like look */
   .grid-bg {
     background-image: 
-      linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-    background-size: 50px 50px;
+      linear-gradient(rgba(255,255,255,.008) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.008) 1px, transparent 1px);
+    background-size: 60px 60px;
   }
 
   /* Animated pulse for live indicators */
   .live-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+
+  /* Snake list item animation */
+  .snake-item {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Undercut window highlight */
+  .undercut-highlight {
+    @apply bg-racing-red/10 border-l-2 border-racing-red;
+  }
+
+  /* Track map styles */
+  .track-map-path {
+    fill: none;
+    stroke: #333;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .track-map-racing-line {
+    fill: none;
+    stroke: #666;
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+  }
+
+  .track-map-risk-zone {
+    fill: rgba(225, 6, 0, 0.3);
+    stroke: #E10600;
+    stroke-width: 2;
+  }
+
+  /* Chart zone markers */
+  .chart-pit-window {
+    fill: rgba(225, 6, 0, 0.15);
+    stroke: rgba(225, 6, 0, 0.5);
+    stroke-width: 1;
+    stroke-dasharray: 4 2;
+  }
+
+  .chart-crossover-line {
+    stroke: #FFD700;
+    stroke-width: 2;
+    stroke-dasharray: 6 3;
+  }
 }
 
 /* Chart customizations */
 .recharts-cartesian-axis-tick-value {
-  fill: #9CA3AF;
-  font-size: 11px;
+  fill: #6b7280;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .recharts-legend-item-text {
   color: #9CA3AF !important;
+  font-size: 11px !important;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none !important;
 }
 
 /* Animation classes */
@@ -158,4 +288,15 @@ body {
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes strategyPulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(225, 6, 0, 0.3);
+    border-color: rgba(225, 6, 0, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(225, 6, 0, 0.6), 0 0 40px rgba(225, 6, 0, 0.3);
+    border-color: rgba(225, 6, 0, 0.8);
+  }
 }

@@ -45,7 +45,7 @@ export default function ModelStatus() {
   const trainModel = async (modelName: string) => {
     setTraining(modelName);
     try {
-      // Train with hybrid approach (will fetch OpenF1 data if available)
+      // Train with hybrid approach (will fetch historical data if available)
       const response = await fetch(`/api/models/train/${modelName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -288,7 +288,7 @@ export default function ModelStatus() {
         <div className="grid grid-cols-3 gap-6 text-sm text-gray-400">
           <div>
             <p className="font-semibold text-white mb-1">Data Source</p>
-            <p>Models can be trained on real OpenF1 data or synthetic data for demonstration.</p>
+            <p>Models can be trained on real historical F1 data or synthetic data for demonstration.</p>
           </div>
           <div>
             <p className="font-semibold text-white mb-1">Algorithms</p>

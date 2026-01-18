@@ -32,9 +32,9 @@ export default function Layout({ sessionKey, onSessionChange, drivers }: LayoutP
   ];
 
   return (
-    <div className="min-h-screen bg-racing-black grid-bg">
-      {/* Top Header Bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-pit-wall/95 backdrop-blur-xl border-b border-white/10">
+    <div className="min-h-screen bg-black">
+      {/* Top Header Bar - Apple-like minimal */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-2xl border-b border-white/[0.06]">
         <div className="flex items-center justify-between px-6 h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
@@ -52,23 +52,21 @@ export default function Layout({ sessionKey, onSessionChange, drivers }: LayoutP
           </div>
 
           {/* Session Selector & Info */}
-          <div className="flex items-center gap-4">
-            <SessionSelector 
-              currentSession={sessionKey}
-              onSelect={onSessionChange}
-            />
+          <div className="flex items-center gap-4 flex-1 justify-end min-w-0">
+            <div className="min-w-0 flex-1 max-w-[400px]">
+              <SessionSelector 
+                currentSession={sessionKey}
+                onSelect={onSessionChange}
+              />
+            </div>
             
             {sessionKey && drivers.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-carbon/30 rounded-lg border border-white/10">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-carbon/30 rounded-lg border border-white/10 flex-shrink-0">
                 <div className="w-2 h-2 bg-timing-green rounded-full live-pulse" />
                 <span className="text-xs text-gray-400">{drivers.length} drivers</span>
               </div>
             )}
             
-            <div className="flex items-center gap-2 text-gray-400">
-              <Radio className="w-4 h-4 text-timing-green" />
-              <span className="text-xs uppercase tracking-wider">OpenF1</span>
-            </div>
           </div>
         </div>
 

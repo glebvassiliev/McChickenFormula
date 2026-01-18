@@ -1,6 +1,6 @@
 """
 Telemetry API Routes
-Real-time and historical telemetry data from OpenF1
+Real-time and historical telemetry data from FastF1
 """
 from fastapi import APIRouter, HTTPException, Request, Query
 from typing import Optional, List
@@ -18,7 +18,7 @@ async def get_live_telemetry(
     driver_number: Optional[int] = None
 ):
     """Get live telemetry data"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     if not session_key:
         # Get latest session
@@ -29,8 +29,8 @@ async def get_live_telemetry(
     
     # Fetch telemetry data
     if driver_number:
-        car_data = await client.get_car_data(session_key, driver_number)
-        position = await client.get_position(session_key, driver_number)
+        car_data = []
+        position = []
     else:
         car_data = []
         position = []
@@ -78,7 +78,7 @@ async def get_lap_data(
     driver_number: Optional[int] = None
 ):
     """Get lap times and sector data"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     try:
         laps = await client.get_laps(session_key, driver_number)
@@ -123,7 +123,7 @@ async def get_stint_data(
     driver_number: Optional[int] = None
 ):
     """Get tire stint information"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     stints = await client.get_stints(session_key, driver_number)
     
     return {
@@ -138,7 +138,7 @@ async def get_interval_data(
     session_key: int
 ):
     """Get gap intervals between drivers"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     intervals = await client.get_intervals(session_key)
     
     # Group by driver and get latest
@@ -164,7 +164,7 @@ async def get_weather_data(
     session_key: int
 ):
     """Get weather conditions"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     try:
         weather = await client.get_weather(session_key)
@@ -200,7 +200,7 @@ async def get_race_control(
     category: Optional[str] = None
 ):
     """Get race control messages"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     messages = await client.get_race_control(session_key, category)
     
     return {
@@ -216,7 +216,7 @@ async def get_pit_stops(
     driver_number: Optional[int] = None
 ):
     """Get pit stop data"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     pits = await client.get_pit_stops(session_key, driver_number)
     
     return {
@@ -232,7 +232,7 @@ async def get_driver_summary(
     session_key: int
 ):
     """Get comprehensive driver summary"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     data = await client.get_driver_race_data(session_key, driver_number)
     drivers = await client.get_drivers(session_key, driver_number)
@@ -269,7 +269,7 @@ async def compare_drivers(
     drivers: str = Query(..., description="Comma-separated driver numbers")
 ):
     """Compare telemetry between multiple drivers"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     driver_numbers = [int(d.strip()) for d in drivers.split(",")]
     
     comparison = {}

@@ -8,6 +8,7 @@ import logging
 
 from app.api import telemetry, strategy, chatbot, models, sessions
 from app.services.openf1_client import OpenF1Client
+from app.services.fastf1_client import FastF1Client
 from app.services.model_manager import ModelManager
 from app.config import settings
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize OpenF1 client
     app.state.openf1_client = OpenF1Client()
+    app.state.fastf1_client = FastF1Client()
     
     # Initialize model manager and load models
     app.state.model_manager = ModelManager()

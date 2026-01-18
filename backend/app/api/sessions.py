@@ -1,9 +1,10 @@
 """
 Sessions API Routes
-Manage F1 sessions from OpenF1
+Manage F1 sessions from FastF1
 """
 from fastapi import APIRouter, HTTPException, Request, Query
 from typing import Optional, List
+from datetime import datetime
 import logging
 import re
 
@@ -17,10 +18,11 @@ async def get_sessions(
     year: Optional[int] = None,
     country: Optional[str] = None,
     session_type: Optional[str] = None,
-    limit: int = Query(default=20, le=100)
+    limit: int = Query(default=20, le=100),
+    include_future: bool = Query(default=False, description="Include sessions that haven't started yet")
 ):
     """Get list of F1 sessions"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     sessions = await client.get_sessions(
         year=year,
@@ -29,9 +31,61 @@ async def get_sessions(
         limit=limit
     )
     
+    # Filter out future sessions unless explicitly requested
+    now = datetime.utcnow()
+    filtered_sessions = []
+    for session in sessions:
+        if include_future:
+            # Include all sessions
+            filtered_sessions.append(session)
+        else:
+            # Only include sessions that have started
+            date_start = session.get("date_start")
+            if date_start:
+                try:
+                    # Parse ISO format date string
+                    start_time = datetime.fromisoformat(date_start.replace('Z', '+00:00'))
+                    # Compare UTC times
+                    if start_time.replace(tzinfo=None) <= now:
+                        filtered_sessions.append(session)
+                except (ValueError, AttributeError):
+                    # If date parsing fails, include the session (better to show than hide)
+                    logger.warning(f"Could not parse date_start for session {session.get('session_key')}: {date_start}")
+                    filtered_sessions.append(session)
+            else:
+                # If no date_start, include it (might be old data without dates)
+                filtered_sessions.append(session)
+    
     # Process sessions for frontend
     processed = []
-    for session in sessions:
+    for session in filtered_sessions:
+        date_start = session.get("date_start")
+        date_end = session.get("date_end")
+        
+        # Determine session status
+        status = "finished"
+        if date_start:
+            try:
+                start_time = datetime.fromisoformat(date_start.replace('Z', '+00:00')).replace(tzinfo=None)
+                if date_end:
+                    end_time = datetime.fromisoformat(date_end.replace('Z', '+00:00')).replace(tzinfo=None)
+                    if now < start_time:
+                        status = "upcoming"
+                    elif now < end_time:
+                        status = "live"
+                    else:
+                        status = "finished"
+                else:
+                    # No end date - assume it's live if started recently (within last 4 hours)
+                    if now < start_time:
+                        status = "upcoming"
+                    elif (now - start_time).total_seconds() < 14400:  # 4 hours
+                        status = "live"
+                    else:
+                        status = "finished"
+            except (ValueError, AttributeError):
+                status = "finished"  # Default if date parsing fails
+        
         processed.append({
             "session_key": session.get("session_key"),
             "session_name": session.get("session_name"),
@@ -39,10 +93,11 @@ async def get_sessions(
             "country_name": session.get("country_name"),
             "country_code": session.get("country_code"),
             "circuit_short_name": session.get("circuit_short_name"),
-            "date_start": session.get("date_start"),
-            "date_end": session.get("date_end"),
+            "date_start": date_start,
+            "date_end": date_end,
             "year": session.get("year"),
-            "meeting_name": session.get("meeting_name")
+            "meeting_name": session.get("meeting_name"),
+            "status": status  # Add status field
         })
     
     return {
@@ -54,7 +109,7 @@ async def get_sessions(
 @router.get("/latest")
 async def get_latest_session(request: Request):
     """Get the most recent session"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     session = await client.get_latest_session()
     
@@ -70,9 +125,28 @@ async def get_session_details(
     session_key: int
 ):
     """Get detailed session information"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
+    # Get session summary
     summary = await client.get_session_summary(session_key)
+    
+    # Also fetch the session metadata to get circuit name, etc.
+    year = session_key // 1000
+    sessions = await client.get_sessions(year=year, limit=1000)
+    session_meta = next((s for s in sessions if s.get("session_key") == session_key), None)
+    
+    if session_meta:
+        # Merge metadata with summary
+        summary.update({
+            "circuit_short_name": session_meta.get("circuit_short_name"),
+            "country_name": session_meta.get("country_name"),
+            "meeting_name": session_meta.get("meeting_name"),
+            "session_name": session_meta.get("session_name"),
+            "session_type": session_meta.get("session_type"),
+            "date_start": session_meta.get("date_start"),
+            "date_end": session_meta.get("date_end"),
+            "year": session_meta.get("year")
+        })
     
     return summary
 
@@ -83,7 +157,7 @@ async def get_session_drivers(
     session_key: int
 ):
     """Get all drivers in a session"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     drivers = await client.get_drivers(session_key=session_key)
     
@@ -142,7 +216,7 @@ async def get_session_standings(
     session_key: int
 ):
     """Get current standings/results for a session"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     try:
         drivers = await client.get_drivers(session_key=session_key)
@@ -170,13 +244,32 @@ async def get_session_standings(
     for driver in drivers:
         num = driver.get("driver_number")
         if num is not None:
+            # Extract name - try multiple fields from OpenF1 API
+            broadcast_name = driver.get("broadcast_name") or ""
+            name_acronym = driver.get("name_acronym") or ""
+            full_name = driver.get("full_name") or driver.get("name_display") or ""
+            
+            # Use broadcast_name (e.g., "VER") or name_acronym, fallback to first 3 chars of full_name
+            name_short = name_acronym or broadcast_name
+            if not name_short and full_name:
+                # Extract initials from full name (e.g., "Max Verstappen" -> "MVE")
+                parts = full_name.split()
+                if len(parts) >= 2:
+                    name_short = (parts[0][0] + parts[-1][0:2]).upper()
+                elif len(parts) == 1:
+                    name_short = parts[0][0:3].upper()
+            
             driver_data[num] = {
                 "driver_number": num,
-                "name": driver.get("name_acronym") or driver.get("name_display") or f"DRV{num}",
-                "full_name": driver.get("full_name") or driver.get("name_display") or "",
+                "name": name_short or f"DRV{num}",
+                "name_acronym": name_short or f"DRV{num}",
+                "full_name": full_name or f"Driver {num}",
+                "broadcast_name": broadcast_name,
                 "team": driver.get("team_name") or "",
+                "team_name": driver.get("team_name") or "",
                 "team_color": driver.get("team_colour") or "333333",
                 "gap_to_leader": None,
+                "gap_to_car_ahead": None,
                 "interval": None,
                 "laps": 0,
                 "best_lap": None
@@ -252,9 +345,10 @@ async def get_session_standings(
 @router.get("/years")
 async def get_available_years(request: Request):
     """Get list of available years with data"""
-    # OpenF1 has data from 2023 onwards
+    client = request.app.state.fastf1_client
+    years = await client.get_available_years()
     return {
-        "years": [2023, 2024, 2025, 2026]
+        "years": years
     }
 
 
@@ -264,7 +358,7 @@ async def get_circuits(
     year: Optional[int] = None
 ):
     """Get list of circuits"""
-    client = request.app.state.openf1_client
+    client = request.app.state.fastf1_client
     
     sessions = await client.get_sessions(year=year, limit=100)
     
