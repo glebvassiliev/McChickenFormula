@@ -5,6 +5,7 @@ Manage F1 sessions from OpenF1
 from fastapi import APIRouter, HTTPException, Request, Query
 from typing import Optional, List
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -107,6 +108,34 @@ async def get_session_drivers(
     }
 
 
+def _parse_duration(duration_value):
+    """Parse ISO duration string (PT1M23.456S) or float to seconds as float"""
+    if duration_value is None:
+        return None
+    
+    # If already a number, return it
+    if isinstance(duration_value, (int, float)):
+        return float(duration_value)
+    
+    # If string, try to parse ISO duration format
+    if isinstance(duration_value, str):
+        # Handle ISO 8601 duration format: PT1M23.456S
+        match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?', duration_value)
+        if match:
+            hours = float(match.group(1) or 0)
+            minutes = float(match.group(2) or 0)
+            seconds = float(match.group(3) or 0)
+            return hours * 3600 + minutes * 60 + seconds
+        
+        # Try to parse as plain number string
+        try:
+            return float(duration_value)
+        except ValueError:
+            pass
+    
+    return None
+
+
 @router.get("/{session_key}/standings")
 async def get_session_standings(
     request: Request,
@@ -115,57 +144,105 @@ async def get_session_standings(
     """Get current standings/results for a session"""
     client = request.app.state.openf1_client
     
-    drivers = await client.get_drivers(session_key=session_key)
-    intervals = await client.get_intervals(session_key)
-    laps = await client.get_laps(session_key)
+    try:
+        drivers = await client.get_drivers(session_key=session_key)
+        logger.info(f"Fetched {len(drivers)} drivers for session {session_key}")
+    except Exception as e:
+        logger.warning(f"No drivers data for session {session_key}: {e}")
+        drivers = []
+    
+    try:
+        intervals = await client.get_intervals(session_key)
+        logger.info(f"Fetched {len(intervals)} intervals for session {session_key}")
+    except Exception as e:
+        logger.warning(f"No intervals data for session {session_key}: {e}")
+        intervals = []
+    
+    try:
+        laps = await client.get_laps(session_key)
+        logger.info(f"Fetched {len(laps)} laps for standings calculation")
+    except Exception as e:
+        logger.warning(f"No laps data for session {session_key}: {e}")
+        laps = []
     
     # Build standings
     driver_data = {}
     for driver in drivers:
         num = driver.get("driver_number")
-        driver_data[num] = {
-            "driver_number": num,
-            "name": driver.get("name_acronym"),
-            "full_name": driver.get("full_name"),
-            "team": driver.get("team_name"),
-            "team_color": driver.get("team_colour"),
-            "gap_to_leader": None,
-            "interval": None,
-            "laps": 0,
-            "best_lap": None
-        }
+        if num is not None:
+            driver_data[num] = {
+                "driver_number": num,
+                "name": driver.get("name_acronym") or driver.get("name_display") or f"DRV{num}",
+                "full_name": driver.get("full_name") or driver.get("name_display") or "",
+                "team": driver.get("team_name") or "",
+                "team_color": driver.get("team_colour") or "333333",
+                "gap_to_leader": None,
+                "interval": None,
+                "laps": 0,
+                "best_lap": None
+            }
     
-    # Add intervals (latest)
+    # Add intervals (latest per driver)
     driver_intervals = {}
     for interval in intervals:
-        driver_intervals[interval.get("driver_number")] = interval
+        driver_num = interval.get("driver_number")
+        if driver_num is not None:
+            # Keep the latest interval for each driver
+            if driver_num not in driver_intervals:
+                driver_intervals[driver_num] = interval
+            else:
+                # Compare dates to keep the latest
+                current_date = driver_intervals[driver_num].get("date")
+                new_date = interval.get("date")
+                if new_date and (not current_date or new_date > current_date):
+                    driver_intervals[driver_num] = interval
     
     for num, interval in driver_intervals.items():
         if num in driver_data:
-            driver_data[num]["gap_to_leader"] = interval.get("gap_to_leader")
-            driver_data[num]["interval"] = interval.get("interval")
+            gap = interval.get("gap_to_leader")
+            # Parse gap if it's a duration string
+            if isinstance(gap, str):
+                gap_seconds = _parse_duration(gap)
+                driver_data[num]["gap_to_leader"] = gap_seconds
+            else:
+                driver_data[num]["gap_to_leader"] = gap
+            
+            interval_val = interval.get("interval")
+            if isinstance(interval_val, str):
+                interval_seconds = _parse_duration(interval_val)
+                driver_data[num]["interval"] = interval_seconds
+            else:
+                driver_data[num]["interval"] = interval_val
     
-    # Add lap data
+    # Add lap data - count laps and find best lap time
     for lap in laps:
         num = lap.get("driver_number")
         if num in driver_data:
             driver_data[num]["laps"] += 1
-            lap_time = lap.get("lap_duration")
-            if lap_time:
+            lap_time = _parse_duration(lap.get("lap_duration"))
+            if lap_time is not None:
                 current_best = driver_data[num]["best_lap"]
                 if current_best is None or lap_time < current_best:
                     driver_data[num]["best_lap"] = lap_time
     
-    # Sort by gap to leader
-    standings = sorted(
-        driver_data.values(),
-        key=lambda x: x["gap_to_leader"] if x["gap_to_leader"] is not None else 9999
-    )
+    # If no intervals, sort by laps completed and best lap time
+    if not intervals:
+        standings = sorted(
+            driver_data.values(),
+            key=lambda x: (-x["laps"], x["best_lap"] if x["best_lap"] is not None else 9999)
+        )
+    else:
+        # Sort by gap to leader
+        standings = sorted(
+            driver_data.values(),
+            key=lambda x: (x["gap_to_leader"] if x["gap_to_leader"] is not None else 9999, x["laps"])
+        )
     
     # Add position
     for i, driver in enumerate(standings):
         driver["position"] = i + 1
     
+    logger.info(f"Generated standings for {len(standings)} drivers")
     return {
         "session_key": session_key,
         "standings": standings

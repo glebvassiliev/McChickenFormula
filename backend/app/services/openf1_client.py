@@ -24,10 +24,34 @@ class OpenF1Client:
         url = f"{self.base_url}/{endpoint}"
         try:
             response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
+            
+            # Handle different status codes gracefully
+            if response.status_code == 404:
+                # 404 means no data found - this is normal for sessions without data
+                logger.debug(f"No data found for {endpoint} with params {params}")
+                return []
+            elif response.status_code >= 400:
+                # Other 4xx/5xx errors are actual problems
+                logger.warning(f"OpenF1 API error {response.status_code} for {endpoint}: {response.text[:200]}")
+                return []
+            
+            data = response.json()
+            
+            # Ensure we return a list (API might return empty dict or None)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict):
+                # Some endpoints might wrap data in a dict
+                if 'data' in data:
+                    return data['data'] if isinstance(data['data'], list) else []
+                return []
+            else:
+                return []
         except httpx.HTTPError as e:
-            logger.error(f"OpenF1 API error: {e}")
+            logger.warning(f"OpenF1 API HTTP error for {endpoint}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error fetching {endpoint}: {e}")
             return []
     
     # ==================== SESSION DATA ====================

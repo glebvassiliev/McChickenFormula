@@ -161,6 +161,21 @@ export default function StrategyAnalysis({ sessionKey }: StrategyAnalysisProps) 
         </button>
       </div>
 
+      {/* Session Warning */}
+      {!sessionKey && (
+        <div className="card p-4 bg-tire-medium/10 border border-tire-medium/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-tire-medium mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold mb-1 text-sm">No Session Selected</h3>
+              <p className="text-xs text-gray-400">
+                Select a track/session from the header dropdown for real-time data. Strategy analysis works with manual inputs below.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-6">
         {/* Input Panel */}
         <motion.div 

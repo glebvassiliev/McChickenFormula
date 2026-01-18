@@ -11,6 +11,7 @@ import ModelStatus from './pages/ModelStatus';
 function App() {
   const [sessionKey, setSessionKey] = useState<number | null>(null);
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [sessionInfo, setSessionInfo] = useState<any>(null);
 
   useEffect(() => {
     // Fetch latest session on mount
@@ -26,12 +27,29 @@ function App() {
 
   useEffect(() => {
     if (sessionKey) {
+      // Fetch drivers for the session
       fetch(`/api/sessions/${sessionKey}/drivers`)
         .then(res => res.json())
         .then(data => setDrivers(data.drivers || []))
         .catch(console.error);
+      
+      // Fetch session details
+      fetch(`/api/sessions/${sessionKey}`)
+        .then(res => res.json())
+        .then(data => setSessionInfo(data))
+        .catch(console.error);
+    } else {
+      setDrivers([]);
+      setSessionInfo(null);
     }
   }, [sessionKey]);
+
+  const handleSessionChange = (key: number) => {
+    setSessionKey(key);
+    // Clear drivers and session info to trigger reload
+    setDrivers([]);
+    setSessionInfo(null);
+  };
 
   return (
     <BrowserRouter>
@@ -41,7 +59,7 @@ function App() {
           element={
             <Layout 
               sessionKey={sessionKey} 
-              onSessionChange={setSessionKey}
+              onSessionChange={handleSessionChange}
               drivers={drivers}
             />
           }

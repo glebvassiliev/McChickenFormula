@@ -11,6 +11,7 @@ import {
   Radio
 } from 'lucide-react';
 import clsx from 'clsx';
+import SessionSelector from './SessionSelector';
 
 interface LayoutProps {
   sessionKey: number | null;
@@ -18,7 +19,7 @@ interface LayoutProps {
   drivers: any[];
 }
 
-export default function Layout({ sessionKey, drivers }: LayoutProps) {
+export default function Layout({ sessionKey, onSessionChange, drivers }: LayoutProps) {
   const location = useLocation();
 
   const navItems = [
@@ -50,23 +51,23 @@ export default function Layout({ sessionKey, drivers }: LayoutProps) {
             </div>
           </div>
 
-          {/* Session Info */}
-          <div className="flex items-center gap-6">
-            {sessionKey && (
-              <div className="flex items-center gap-3 px-4 py-2 bg-carbon/50 rounded-lg border border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-timing-green rounded-full live-pulse" />
-                  <span className="text-xs uppercase tracking-wider text-gray-400">Session</span>
-                </div>
-                <span className="font-mono text-sm text-white">{sessionKey}</span>
-                <span className="text-xs text-gray-500">|</span>
+          {/* Session Selector & Info */}
+          <div className="flex items-center gap-4">
+            <SessionSelector 
+              currentSession={sessionKey}
+              onSelect={onSessionChange}
+            />
+            
+            {sessionKey && drivers.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-carbon/30 rounded-lg border border-white/10">
+                <div className="w-2 h-2 bg-timing-green rounded-full live-pulse" />
                 <span className="text-xs text-gray-400">{drivers.length} drivers</span>
               </div>
             )}
             
             <div className="flex items-center gap-2 text-gray-400">
               <Radio className="w-4 h-4 text-timing-green" />
-              <span className="text-xs uppercase tracking-wider">OpenF1 Connected</span>
+              <span className="text-xs uppercase tracking-wider">OpenF1</span>
             </div>
           </div>
         </div>

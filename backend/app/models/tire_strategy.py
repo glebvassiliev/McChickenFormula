@@ -1,6 +1,7 @@
 """
 Tire Strategy ML Model
 Predicts optimal tire compound selection and stint lengths
+Uses hybrid approach: Real OpenF1 data + Domain knowledge
 """
 import numpy as np
 import pandas as pd
@@ -61,14 +62,20 @@ class TireStrategyModel:
         return np.array(features).reshape(1, -1)
     
     async def train(self, training_data: Dict) -> Dict[str, Any]:
-        """Train the tire strategy models"""
+        """Train the tire strategy models using hybrid approach"""
         try:
-            # Convert training data to DataFrame
-            df = pd.DataFrame(training_data.get("samples", []))
-            
-            if len(df) < 10:
-                # Use synthetic data for demo if not enough real data
-                df = self._generate_synthetic_data(500)
+            # Check if hybrid data is provided
+            if "hybrid_data" in training_data:
+                # Use pre-processed hybrid dataset
+                df = training_data["hybrid_data"]
+                logger.info(f"Using hybrid dataset: {len(df)} samples ({df['data_source'].value_counts().to_dict() if 'data_source' in df.columns else 'unknown'})")
+            else:
+                # Fallback to old method
+                df = pd.DataFrame(training_data.get("samples", []))
+                
+                if len(df) < 10:
+                    # Use synthetic data for demo if not enough real data
+                    df = self._generate_synthetic_data(500)
             
             # Prepare features
             feature_cols = [
@@ -83,55 +90,85 @@ class TireStrategyModel:
             X = df[feature_cols].values
             X_scaled = self.scaler.fit_transform(X)
             
+            # Get sample weights if available (for hybrid training)
+            sample_weights = None
+            if "sample_weight" in df.columns:
+                sample_weights = df["sample_weight"].values
+                logger.info(f"Using sample weights for hybrid training")
+            
+            # Create consistent train/test split indices
+            indices = np.arange(len(X_scaled))
+            train_idx, test_idx = train_test_split(
+                indices, test_size=0.2, random_state=42
+            )
+            
             # Train compound classifier
             y_compound = self.label_encoder.transform(df["optimal_compound"])
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_compound, test_size=0.2, random_state=42
-            )
+            X_train, X_test = X_scaled[train_idx], X_scaled[test_idx]
+            y_train, y_test = y_compound[train_idx], y_compound[test_idx]
+            weights_train = sample_weights[train_idx] if sample_weights is not None else None
             
             self.compound_classifier = RandomForestClassifier(
                 n_estimators=100,
                 max_depth=10,
-                random_state=42
+                random_state=42,
+                class_weight="balanced" if sample_weights is None else None
             )
-            self.compound_classifier.fit(X_train, y_train)
+            self.compound_classifier.fit(X_train, y_train, sample_weight=weights_train)
             compound_accuracy = self.compound_classifier.score(X_test, y_test)
             
-            # Train stint length regressor
+            # Train stint length regressor (use same split)
             y_stint = df["optimal_stint_length"].values
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_stint, test_size=0.2, random_state=42
-            )
+            X_train, X_test = X_scaled[train_idx], X_scaled[test_idx]
+            y_train, y_test = y_stint[train_idx], y_stint[test_idx]
+            weights_train = sample_weights[train_idx] if sample_weights is not None else None
             
             self.stint_regressor = GradientBoostingRegressor(
                 n_estimators=100,
                 max_depth=6,
                 random_state=42
             )
-            self.stint_regressor.fit(X_train, y_train)
+            # GradientBoostingRegressor supports sample_weight
+            if weights_train is not None:
+                self.stint_regressor.fit(X_train, y_train, sample_weight=weights_train)
+            else:
+                self.stint_regressor.fit(X_train, y_train)
             stint_r2 = self.stint_regressor.score(X_test, y_test)
             
-            # Train degradation predictor
+            # Train degradation predictor (use same split)
             y_degradation = df["degradation_rate"].values
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_degradation, test_size=0.2, random_state=42
-            )
+            X_train, X_test = X_scaled[train_idx], X_scaled[test_idx]
+            y_train, y_test = y_degradation[train_idx], y_degradation[test_idx]
+            weights_train = sample_weights[train_idx] if sample_weights is not None else None
             
             self.degradation_regressor = GradientBoostingRegressor(
                 n_estimators=100,
                 max_depth=6,
                 random_state=42
             )
-            self.degradation_regressor.fit(X_train, y_train)
+            if weights_train is not None:
+                self.degradation_regressor.fit(X_train, y_train, sample_weight=weights_train)
+            else:
+                self.degradation_regressor.fit(X_train, y_train)
             degradation_r2 = self.degradation_regressor.score(X_test, y_test)
             
             self.is_trained = True
+            
+            # Calculate data source breakdown
+            data_breakdown = {}
+            if "data_source" in df.columns:
+                data_breakdown = df["data_source"].value_counts().to_dict()
+            else:
+                data_breakdown = {"unknown": len(df)}
             
             return {
                 "compound_classifier_accuracy": round(compound_accuracy, 4),
                 "stint_regressor_r2": round(stint_r2, 4),
                 "degradation_regressor_r2": round(degradation_r2, 4),
-                "samples_used": len(df)
+                "samples_used": len(df),
+                "data_breakdown": data_breakdown,
+                "real_samples": data_breakdown.get("real", 0),
+                "synthetic_samples": data_breakdown.get("synthetic", 0)
             }
             
         except Exception as e:

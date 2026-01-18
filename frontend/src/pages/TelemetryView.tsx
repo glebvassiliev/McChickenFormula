@@ -30,6 +30,14 @@ export default function TelemetryView({ sessionKey, drivers }: TelemetryViewProp
   const [stints, setStints] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Reset when session changes
+  useEffect(() => {
+    setSelectedDriver(null);
+    setDriverData(null);
+    setLapTimes([]);
+    setStints([]);
+  }, [sessionKey]);
+
   useEffect(() => {
     if (drivers.length > 0 && !selectedDriver) {
       setSelectedDriver(drivers[0].driver_number);
@@ -37,19 +45,29 @@ export default function TelemetryView({ sessionKey, drivers }: TelemetryViewProp
   }, [drivers, selectedDriver]);
 
   useEffect(() => {
-    if (sessionKey && selectedDriver) {
-      setLoading(true);
-      
-      Promise.all([
-        fetch(`/api/telemetry/driver/${selectedDriver}/summary?session_key=${sessionKey}`),
-        fetch(`/api/telemetry/laps?session_key=${sessionKey}&driver_number=${selectedDriver}`),
-        fetch(`/api/telemetry/stints?session_key=${sessionKey}&driver_number=${selectedDriver}`)
-      ])
-        .then(async ([summaryRes, lapsRes, stintsRes]) => {
-          const summary = await summaryRes.json();
-          const laps = await lapsRes.json();
-          const stintsData = await stintsRes.json();
-          
+    if (!sessionKey || !selectedDriver) {
+      setDriverData(null);
+      setLapTimes([]);
+      setStints([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    
+    Promise.all([
+      fetch(`/api/telemetry/driver/${selectedDriver}/summary?session_key=${sessionKey}`),
+      fetch(`/api/telemetry/laps?session_key=${sessionKey}&driver_number=${selectedDriver}`),
+      fetch(`/api/telemetry/stints?session_key=${sessionKey}&driver_number=${selectedDriver}`)
+    ])
+      .then(async ([summaryRes, lapsRes, stintsRes]) => {
+        if (cancelled) return;
+        
+        const summary = await summaryRes.json();
+        const laps = await lapsRes.json();
+        const stintsData = await stintsRes.json();
+        
+        if (!cancelled) {
           setDriverData(summary);
           setLapTimes(laps.laps?.map((l: any) => ({
             lap: l.lap_number,
@@ -61,10 +79,25 @@ export default function TelemetryView({ sessionKey, drivers }: TelemetryViewProp
             tyre_life: l.tyre_life
           })) || []);
           setStints(stintsData.stints || []);
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch driver data:', err);
+        if (!cancelled) {
+          setDriverData(null);
+          setLapTimes([]);
+          setStints([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [sessionKey, selectedDriver]);
 
   const formatTime = (seconds: number | null) => {
@@ -73,6 +106,21 @@ export default function TelemetryView({ sessionKey, drivers }: TelemetryViewProp
     const secs = (seconds % 60).toFixed(3);
     return `${mins}:${secs.padStart(6, '0')}`;
   };
+
+  // Show message if no session selected
+  if (!sessionKey) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Activity className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No Session Selected</h3>
+          <p className="text-gray-400 mb-4">
+            Please select a track/session from the dropdown in the header above
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

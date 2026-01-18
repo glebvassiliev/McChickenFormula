@@ -45,10 +45,15 @@ export default function ModelStatus() {
   const trainModel = async (modelName: string) => {
     setTraining(modelName);
     try {
+      // Train with hybrid approach (will fetch OpenF1 data if available)
       const response = await fetch(`/api/models/train/${modelName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ use_synthetic: true })
+        body: JSON.stringify({ 
+          hybrid_mode: true,
+          real_data_weight: 0.7,
+          synthetic_data_weight: 0.3
+        })
       });
       const result = await response.json();
       setTrainingResults(prev => ({ ...prev, [modelName]: result }));
@@ -63,7 +68,10 @@ export default function ModelStatus() {
   const trainAllModels = async () => {
     setTraining('all');
     try {
-      const response = await fetch('/api/models/train-all', { method: 'POST' });
+      // Train all with hybrid approach
+      const response = await fetch('/api/models/train-all?hybrid_mode=true&real_data_weight=0.7', { 
+        method: 'POST' 
+      });
       const result = await response.json();
       setTrainingResults(result.results || {});
       fetchModelStatus();
@@ -189,15 +197,36 @@ export default function ModelStatus() {
             {trainingResults[model.name] && (
               <div className="p-3 bg-timing-green/10 border border-timing-green/30 rounded-lg">
                 <p className="text-xs font-semibold text-timing-green mb-2">Training Complete!</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {Object.entries(trainingResults[model.name].metrics || {}).map(([key, value]) => (
-                    <div key={key}>
-                      <span className="text-gray-400">{key}: </span>
-                      <span className="font-mono">
-                        {typeof value === 'number' ? (value as number).toFixed(4) : String(value)}
+                
+                {/* Data Breakdown */}
+                {trainingResults[model.name].data_info?.data_breakdown && (
+                  <div className="mb-2 p-2 bg-carbon/50 rounded text-xs">
+                    <p className="text-gray-400 mb-1">Data Sources:</p>
+                    <div className="flex gap-2">
+                      <span className="text-timing-green">
+                        {trainingResults[model.name].data_info.data_breakdown.real || 0} real
+                      </span>
+                      <span className="text-gray-500">+</span>
+                      <span className="text-tire-medium">
+                        {trainingResults[model.name].data_info.data_breakdown.synthetic || 0} synthetic
                       </span>
                     </div>
-                  ))}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {Object.entries(trainingResults[model.name].metrics || {}).map(([key, value]) => {
+                    // Skip data_breakdown (already shown above)
+                    if (key === 'data_breakdown') return null;
+                    return (
+                      <div key={key}>
+                        <span className="text-gray-400">{key.replace('_', ' ')}: </span>
+                        <span className="font-mono">
+                          {typeof value === 'number' ? (value as number).toFixed(4) : String(value)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

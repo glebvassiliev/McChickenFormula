@@ -5,6 +5,7 @@ Real-time and historical telemetry data from OpenF1
 from fastapi import APIRouter, HTTPException, Request, Query
 from typing import Optional, List
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,6 +43,34 @@ async def get_live_telemetry(
     }
 
 
+def _parse_duration(duration_value):
+    """Parse ISO duration string (PT1M23.456S) or float to seconds as float"""
+    if duration_value is None:
+        return None
+    
+    # If already a number, return it
+    if isinstance(duration_value, (int, float)):
+        return float(duration_value)
+    
+    # If string, try to parse ISO duration format
+    if isinstance(duration_value, str):
+        # Handle ISO 8601 duration format: PT1M23.456S
+        match = re.match(r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?', duration_value)
+        if match:
+            hours = float(match.group(1) or 0)
+            minutes = float(match.group(2) or 0)
+            seconds = float(match.group(3) or 0)
+            return hours * 3600 + minutes * 60 + seconds
+        
+        # Try to parse as plain number string
+        try:
+            return float(duration_value)
+        except ValueError:
+            pass
+    
+    return None
+
+
 @router.get("/laps")
 async def get_lap_data(
     request: Request,
@@ -50,23 +79,36 @@ async def get_lap_data(
 ):
     """Get lap times and sector data"""
     client = request.app.state.openf1_client
-    laps = await client.get_laps(session_key, driver_number)
+    
+    try:
+        laps = await client.get_laps(session_key, driver_number)
+        logger.info(f"Fetched {len(laps)} laps for session {session_key}")
+    except Exception as e:
+        logger.warning(f"No lap data for session {session_key}: {e}")
+        laps = []
     
     # Process lap data for visualization
     processed_laps = []
     for lap in laps:
-        processed_laps.append({
-            "driver_number": lap.get("driver_number"),
-            "lap_number": lap.get("lap_number"),
-            "lap_duration": lap.get("lap_duration"),
-            "sector_1_time": lap.get("duration_sector_1"),
-            "sector_2_time": lap.get("duration_sector_2"),
-            "sector_3_time": lap.get("duration_sector_3"),
-            "is_pit_out_lap": lap.get("is_pit_out_lap"),
-            "compound": lap.get("compound"),
-            "tyre_life": lap.get("tyre_life")
-        })
+        lap_duration = _parse_duration(lap.get("lap_duration"))
+        lap_number = lap.get("lap_number")
+        driver_num = lap.get("driver_number")
+        
+        # Only include laps with valid lap times and lap numbers
+        if lap_duration is not None and lap_number is not None and driver_num is not None:
+            processed_laps.append({
+                "driver_number": driver_num,
+                "lap_number": lap_number,
+                "lap_duration": lap_duration,  # Now always a float in seconds
+                "sector_1_time": _parse_duration(lap.get("duration_sector_1")),
+                "sector_2_time": _parse_duration(lap.get("duration_sector_2")),
+                "sector_3_time": _parse_duration(lap.get("duration_sector_3")),
+                "is_pit_out_lap": lap.get("is_pit_out_lap", False),
+                "compound": lap.get("compound"),
+                "tyre_life": lap.get("tyre_life")
+            })
     
+    logger.info(f"Processed {len(processed_laps)} valid laps for session {session_key}")
     return {
         "session_key": session_key,
         "total_laps": len(processed_laps),
@@ -123,7 +165,12 @@ async def get_weather_data(
 ):
     """Get weather conditions"""
     client = request.app.state.openf1_client
-    weather = await client.get_weather(session_key)
+    
+    try:
+        weather = await client.get_weather(session_key)
+    except Exception as e:
+        logger.warning(f"No weather data for session {session_key}: {e}")
+        weather = []
     
     # Process for timeline
     weather_timeline = []
